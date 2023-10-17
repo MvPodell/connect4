@@ -31,7 +31,6 @@ struct GPUCamera {
 struct GPUSprite {
     screen_region: [f32; 4],
     sheet_region: [f32; 4],
-    //cell_region:[f32; 16],
 }
 
 #[repr(C)]
@@ -46,6 +45,177 @@ enum SpriteOption {
     Uniform,
     VertexBuffer,
 }
+
+#[derive(Copy, Clone)]
+struct Space {
+    x_space: f32,
+    y_space: f32,
+    color: &'static str, // Use a string slice for color
+    filled: bool,
+}
+
+impl Space {
+    fn new(x: f32, y: f32, color: &'static str) -> Self {
+        Space {
+            x_space: x,
+            y_space: y,
+            color,
+            filled: false,
+        }
+    }
+}
+
+struct GameGrid {
+    grid: [[Space; 7]; 6],
+}
+
+impl GameGrid {
+    fn new() -> Self {
+        let mut grid = [[Space::new(0.0, 0.0, "white"); 7]; 6];
+
+        // Initialize the grid with space objects
+        let mut y_cord = 518.0;
+        let mut x_cord = 8.0;
+        for row in 0..6 {
+            for col in 0..7 {
+                let x = x_cord; // Adjust X coordinate as needed
+                let y = y_cord; // Adjust Y coordinate as needed
+                grid[row][col] = Space::new(x, y, "nah");
+                y_cord -= 88.0;
+            }
+            x_cord += 98.0;
+            y_cord = 518.0;
+        }
+
+        GameGrid { grid }
+    }
+
+    fn print_grid(&self) {
+        for row in &self.grid {
+            for space in row {
+                if space.filled {
+                    print!("1 "); // You can change this to any character or representation for filled spaces
+                } else {
+                    print!("0 "); // You can change this to any character or representation for empty spaces
+                }
+            }
+            println!();
+        }
+    }
+
+    fn fill_space(&mut self, x: usize, y: usize, color: &'static str,) {
+        if x < 7 && y < 6 {
+            self.grid[y][x].filled = true;
+            self.grid[y][x].color = color;
+        }
+    }
+
+    fn print_space(&self, x: usize, y: usize) {
+        if x < 7 && y < 6 {
+            let space = &self.grid[y][x];
+            println!("x: {}, y: {}, color: {}, filled: {}", space.x_space, space.y_space, space.color, space.filled);
+        } else {
+            println!("Invalid indices");
+        }
+    }
+
+    fn check_win(&self) -> bool {
+        // Check horizontally
+        for row in &self.grid {
+            let mut consecutive_count = 0;
+            let mut last_color = "";
+
+            for space in row {
+                if space.filled && space.color == last_color {
+                    consecutive_count += 1;
+                    if consecutive_count == 4 {
+                        return true; // Four consecutive spaces found horizontally
+                    }
+                } else {
+                    consecutive_count = 1;
+                    last_color = space.color;
+                }
+            }
+        }
+
+        // Check vertically
+        for col in 0..7 {
+            let mut consecutive_count = 0;
+            let mut last_color = "";
+
+            for row in 0..6 {
+                let space = &self.grid[row][col];
+
+                if space.filled && space.color == last_color {
+                    consecutive_count += 1;
+                    if consecutive_count == 4 {
+                        return true; // Four consecutive spaces found vertically
+                    }
+                } else {
+                    consecutive_count = 1;
+                    last_color = space.color;
+                }
+            }
+        }
+
+        // Check diagonally (top-left to bottom-right)
+        for start_row in 0..3 {
+            for start_col in 0..4 {
+                let mut consecutive_count = 0;
+                let mut last_color = "";
+
+                for step in 0..4 {
+                    let row = start_row + step;
+                    let col = start_col + step;
+
+                    let space = &self.grid[row][col];
+
+                    if space.filled && space.color == last_color {
+                        consecutive_count += 1;
+                        if consecutive_count == 4 {
+                            return true; // Four consecutive spaces found diagonally
+                        }
+                    } else {
+                        consecutive_count = 1;
+                        last_color = space.color;
+                    }
+                }
+            }
+        }
+
+        // Check diagonally (top-right to bottom-left)
+        for start_row in 0..3 {
+            for start_col in 3..7 {
+                let mut consecutive_count = 0;
+                let mut last_color = "";
+
+                for step in 0..4 {
+                    let row = start_row + step;
+                    let col = start_col - step;
+
+                    let space = &self.grid[row][col];
+
+                    if space.filled && space.color == last_color {
+                        consecutive_count += 1;
+                        if consecutive_count == 4 {
+                            return true; // Four consecutive spaces found diagonally
+                        }
+                    } else {
+                        consecutive_count = 1;
+                        last_color = space.color;
+                    }
+                }
+            }
+        }
+
+        false // No four consecutive spaces found
+    }
+
+    
+}
+
+// let sprite = GPUSprite {}; // Assuming this is a valid way to create an instance of GPUSprite
+// let new_space = space::new(1.0, 2.0, sprite);
 
 #[cfg(all(not(feature = "uniforms"), not(feature = "vbuf")))]
 const SPRITES: SpriteOption = SpriteOption::Storage;
@@ -313,11 +483,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         GPUSprite {
             screen_region: [0.0, 0.0, 700.0, 650.0],
             sheet_region: [0.0, 0.0 / 650.0, 700.0 / 800.0, 650.0 / 650.0],
-            //cell_region: [1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         }, 
     ];
+
+
     let mut cell_sprites: Vec<GPUSprite> = Vec::new();
-    for _ in 0..21 {
+    for _ in 0..70 {
         let sprite = GPUSprite {
             screen_region: [700.0, 0.0, 100.0, 85.0],
             sheet_region: [700.0 / 800.0, 0.0 / 650.0, 100.0 / 800.0, 85.0/ 650.0]
@@ -339,7 +510,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // let cell_height = window_height / 160.0;
 
     // Initialize sprite positions within the grid
-    let mut sprite_position: [f32; 2] = [300.0, 650.0];
+    let mut sprite_position: [f32; 2] = [302.0, 518.0];
 
     // current sprite
     let mut curr_sprite_index = 1;
@@ -347,6 +518,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // initialize vertical position
     let mut vertical_position: f32 = 0.0;
+    // let mut horizontal_position: f32 = 302.0;
     let scroll_speed: f32 = 2.0;
 
     const SPRITE_UNIFORM_SIZE: u64 = 512 * mem::size_of::<GPUSprite>() as u64;
@@ -392,7 +564,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     queue.write_buffer(&buffer_camera, 0, bytemuck::bytes_of(&camera));
     queue.write_buffer(&buffer_sprite, 0, bytemuck::cast_slice(&sprites));
+
     let mut input = input::Input::default();
+    let mut game_grid = GameGrid::new();
+    
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
@@ -408,30 +583,71 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-  
-                if input.is_key_pressed(winit::event::VirtualKeyCode::Left) {
-                    sprite_position[0] -= cell_width;
 
+                
+  
+                // handles the left movement of the chip
+                if input.is_key_pressed(winit::event::VirtualKeyCode::Left) {
                     if sprite_position[0] <= 10.0 {
                         sprite_position[0] = 10.0;
                     }
+                    
+                    else{
+                       sprite_position[0] -= cell_width; 
+                    }
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
+                // handles the right movement 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Right) {
 
                     // println!("{}", window_width);
-                    if sprite_position[0] >= 603.0 {
-                        sprite_position[0] = 603.0;
+                    if sprite_position[0] >= 596.0 {
+                        sprite_position[0] = 596.0;
                     } else {
                         sprite_position[0] += cell_width;
                     }
+
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
+
+                // handles the down movemnet
+                if input.is_key_pressed(winit::event::VirtualKeyCode::Down) {
+                    // println!("{}   {}", x, curr_x);
+                    
+
+                    // vertical_position += 90.0;
+                    sprite_position[1] -= 88.0;
+
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                }
+
+                if input.is_key_pressed(winit::event::VirtualKeyCode::Up) {
+
+                    println!("Game Over?");
+                    println!("{}",game_grid.check_win());
+
+                    // Fill a space (for example, at X=2 and Y=3)
+
+                    // Print the updated grid
+                    println!("Updated Grid:");
+                    game_grid.print_grid();
+                    // println!("{:?}", game_grid.print_space(2,5));
+
+                    println!("Game Over?");
+                    println!("{}",game_grid.check_win());
+
+                }
+
+                sprite_position[1] -= scroll_speed;
+
+
 
                 //update sprite position based in key presses
                 sprites[curr_sprite_index].screen_region[0] = sprite_position[0];
                 sprites[curr_sprite_index].screen_region[1] = sprite_position[1];
 
-                vertical_position += scroll_speed; // You can adjust the scroll speed as needed
+                // vertical_position += scroll_speed; // You can adjust the scroll speed as needed
                 
                 // get the current location
                 let curr_x = sprites[curr_sprite_index].screen_region[0];
@@ -454,30 +670,81 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                 if collision {
                     println!("{}", "collision!");
-                    //update sprite position to be 90px above sprite location
-                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 90.0;
-
+                    //update sprite position to be 88px above sprite location
+                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 88.0;
+                    sprite_position[1] += 88.0;
                     // move onto the next sprite
                     curr_sprite_index += 1;
                     // move the cell pointer one forward to mark that another has been added to the screen
                     curr_cell_index += 1;
                     vertical_position = 0.0;
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    println!("{}", " yo collision!");
+                    println!("{} {}", ((sprite_position[0] as usize - 8) / 88), 5 - (sprite_position[1] as usize - 78) / 88);
+
+                    if curr_sprite_index % 2 == 0 {
+                    game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "yellow");
+                    }
+
+                    else{
+                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "red");
+                    }
+
+                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
+                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+                    sprite_position[0] = 302.0;
+                    sprite_position[1] = 518.0;
 
                     // check if the piece has hit the bottom of the screen
-                } else if vertical_position > 568.0 {
+                } else if sprite_position[1] < 78.0 {
                     println!("{}", "bottom!");
                     // set the current sprite's y to the bottom of the screen
-                    sprites[curr_sprite_index].screen_region[1] = 82.0;
+                    sprites[curr_sprite_index].screen_region[1] = 78.0;
+                    sprite_position[1] = 78.0;
 
                     // move onto the next sprite 
                     curr_sprite_index += 1;
                     // move the cell pointer one forward to mark that another has been added to the screen
                     curr_cell_index += 1;
                     vertical_position = 0.0;
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    println!("{}", " yo bottom!");
+                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
+                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+
+
+                    // let result = (sprite_position[0] as usize - 8) / 88; // Convert f32 to usize
+                    // println!("{}", result);
+
+                    println!("{} {}", 5 - (sprite_position[1] as usize - 78) / 96, (sprite_position[0] as usize - 8) / 88);
+                    
+
+                    // game_grid.fill_space(5 - (sprite_position[1] as usize - 78) , (sprite_position[0] as usize - 8) / 88, "red");
+                    if curr_sprite_index % 2 == 0 {
+                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "yellow");
+                        }
+    
+                    else{
+                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "red");
+                    }
+                    sprite_position[0] = 302.0;
+                    sprite_position[1] = 518.0;
+
+
+
+                    
+
+                    
+
                 }
+
+                else{
+                
                 // Update the Y-coordinate of each sprite
-                sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1] - vertical_position;
-                //
+                sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
+                sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+                }
+                
                 
                 // Then send the data to the GPU!
                 input.next_frame();
