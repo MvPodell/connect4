@@ -1,5 +1,3 @@
-// TODO: remove SpriteOption if it doesn't do anything
-
 use bytemuck::{Pod, Zeroable};
 use std::{borrow::Cow, mem};
 use winit::{
@@ -24,12 +22,6 @@ struct GPUSprite {
     sheet_region: [f32; 4],
 }
 
-// #[repr(C)]
-// #[derive(Clone, Copy)]
-// struct Grid {
-//     rows: [[Occupation; 10]; 24]
-// }
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SpriteOption {
     Storage,
@@ -39,17 +31,13 @@ enum SpriteOption {
 
 #[derive(Copy, Clone)]
 struct Space {
-    x_space: f32,
-    y_space: f32,
     color: &'static str, // Use a string slice for color
     filled: bool,
 }
 
 impl Space {
-    fn new(x: f32, y: f32, color: &'static str) -> Self {
+    fn new(color: &'static str) -> Self {
         Space {
-            x_space: x,
-            y_space: y,
             color,
             filled: false,
         }
@@ -62,20 +50,13 @@ struct GameGrid {
 
 impl GameGrid {
     fn new() -> Self {
-        let mut grid = [[Space::new(0.0, 0.0, "white"); 7]; 6];
+        let mut grid = [[Space::new("white"); 7]; 6];
 
         // Initialize the grid with space objects
-        let mut y_cord = 600.0;
-        let mut x_cord = 8.0;
         for row in 0..6 {
             for col in 0..7 {
-                let x = x_cord; // Adjust X coordinate as needed
-                let y = y_cord; // Adjust Y coordinate as needed
-                grid[row][col] = Space::new(x, y, "nah");
-                y_cord -= 88.0;
+                grid[row][col] = Space::new("None");
             }
-            x_cord += 101.0;
-            y_cord = 600.0;
         }
 
         GameGrid { grid }
@@ -98,24 +79,6 @@ impl GameGrid {
         if x < 7 && y < 6 {
             self.grid[y][x].filled = true;
             self.grid[y][x].color = color;
-        }
-    }
-
-    fn print_space(&self, x: usize, y: usize) {
-        if x < 7 && y < 6 {
-            let space = &self.grid[y][x];
-            println!("x: {}, y: {}, color: {}, filled: {}", space.x_space, space.y_space, space.color, space.filled);
-        } else {
-            println!("Invalid indices");
-        }
-    }
-
-    fn check_space(&self, x: usize, y: usize) -> bool {
-        if x < 7 && y < 6 {
-            let space = &self.grid[y][x];
-            return space.filled;
-        } else {
-            return false; // Invalid indices are considered as not filled
         }
     }
 
@@ -207,15 +170,9 @@ impl GameGrid {
                 }
             }
         }
-
         return (false, &"") // No four consecutive spaces found
     }
-
-    
 }
-
-// let sprite = GPUSprite {}; // Assuming this is a valid way to create an instance of GPUSprite
-// let new_space = space::new(1.0, 2.0, sprite);
 
 #[cfg(all(not(feature = "uniforms"), not(feature = "vbuf")))]
 const SPRITES: SpriteOption = SpriteOption::Storage;
@@ -493,7 +450,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
     });
 
-    
     let camera = GPUCamera {
         screen_pos: [0.0, 0.0],
         screen_size: [724.0, 650.0],
@@ -504,19 +460,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
-    // let grid: Grid = Grid { rows: [[Occupation::Empty; 10]; 24]};
+
     let mut sprites: Vec<GPUSprite> = vec![ 
         // these sprites initial locations are determined by sprite_position_x
         // screen_region [x,y,z,w] = top left corner x, top left corner y, width, height
         // sheet_region [x,y,z,w] = divided by spritesheet width, divided by spritesheet height, divided by spritesheet width, divided by spritesheet height, divided by spritesheet width, divided by spritesheet height,
-        // T1
         GPUSprite {
             screen_region: [0.0, 0.0, 724.0, 650.0],
             sheet_region: [0.0, 0.0 / 810.0, 724.0 / 724.0, 650.0 / 810.0],
         }, 
     ];
 
-    for _ in 0..70 {
+    for _ in 0..21 {
         let sprite = GPUSprite {
             screen_region: [0.0, 651.0, 70.0, 67.0],
             sheet_region: [0.0 / 724.0, 651.0 / 810.0, 70.0 / 724.0, 67.0/ 810.0]
@@ -530,19 +485,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     }
 
     // here divide by a number to create the number of grids
-    let cell_width = 104.0 ;
+    let cell_width = 103.0 ;
 
     // Initialize sprite positions within the grid
     let mut sprite_position: [f32; 2] = [330.0, 575.0];
 
     // current sprite
     let mut curr_sprite_index = 1;
-    let mut curr_cell_index = 1;
-
-    // initialize vertical position
-    let mut vertical_position: f32 = 0.0;
-    // let mut horizontal_position: f32 = 302.0;
-    let scroll_speed: f32 = 2.0;
+    let mut placed_cells = 1;
 
     const SPRITE_UNIFORM_SIZE: u64 = 512 * mem::size_of::<GPUSprite>() as u64;
 
@@ -590,7 +540,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut input = input::Input::default();
     let mut game_grid = GameGrid::new();
-    let mut game_over = false;
     let mut show_end_screen = false;
     let mut win_color = "".to_string();
 
@@ -603,12 +552,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .expect("Couldn't load game over img");
     
     event_loop.run(move |event, _, control_flow| {
-        // if game_over {
-        //     // If the 'over' variable is true, exit the event loop
-        //     *control_flow = ControlFlow::Exit;
-        //     return;
-        // }
-    
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent {
@@ -630,13 +573,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     for curr in 1..curr_sprite_index {
                         let x = sprites[curr].screen_region[0];
                         let y = sprites[curr].screen_region[1];
-                        println!("{}   {}", sprite_position[0], x);
                         if x == sprite_position[0]-cell_width && y == sprite_position[1] {
                             // Update the screen_region of the current sprite
                             x_occupied = true;
                         } 
                     }
-
                     if sprite_position[0] <= 124.0 {
                         sprite_position[0] = 21.0;
                     } 
@@ -651,55 +592,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     for curr in 1..curr_sprite_index {
                         let x = sprites[curr].screen_region[0];
                         let y = sprites[curr].screen_region[1];
-                        println!("{}   {}", sprite_position[0], x);
-                        if x == sprite_position[0]+cell_width && y == sprite_position[1] {
-                            // Update the screen_region of the current sprite
+                        if x == sprite_position[0] + cell_width && y == sprite_position[1] {
                             x_occupied = true;
                         } 
                     }
-                    // println!("{}", window_width);
+
                     if sprite_position[0] > 536.0 {
                         sprite_position[0] = 638.0;
                     } else if !x_occupied {
                         sprite_position[0] += cell_width;
                     }
-
-                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Down) {
-
                     sprite_position[1] -= 81.0;
-                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Up) {
-
-
-                    // let (is_winner, winning_color) = game_grid.check_win();
-                    // println!("{}", game_grid.print_grid());
                     game_grid.print_grid();
                     let my_bool = game_grid.check_win();
                     println!("{:?}", my_bool)
-                    // if is_winner {
-                    //     println!("Player {} wins!", winning_color);
-                    // } else {
-                    //     println!("No winner yet.");
-                    // }
-
-
                 }
-                
-                // make the sprite scroll down each frame
-                // sprite_position[1] -= scroll_speed;
-
-
 
                 //update sprite position based in key presses
                 sprites[curr_sprite_index].screen_region[0] = sprite_position[0];
                 sprites[curr_sprite_index].screen_region[1] = sprite_position[1];
-
-                // vertical_position += scroll_speed; // You can adjust the scroll speed as needed
                 
                 // get the current location
                 let curr_x = sprites[curr_sprite_index].screen_region[0];
@@ -711,10 +628,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 for curr in 1..curr_sprite_index {
                     let x = sprites[curr].screen_region[0];
                     let y = sprites[curr].screen_region[1];
-                    // println!("x{}   {}", x, curr_x);
-                    // println!("y{}   curry{}", y, curr_y);
+
                     if x == curr_x && y == curr_y {
-                        // Update the screen_region of the current sprite
                         y_being_checked = y;
                         collision = true;
                     } 
@@ -727,90 +642,68 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     sprites[curr_sprite_index].screen_region[1] = y_being_checked + 81.0;
                     sprite_position[1] += 81.0;
 
+                    // left x coordinate plus half the width selects the center of the sprite 
+                    let grid_x = (sprites[curr_sprite_index].screen_region[0] as usize + sprites[curr_sprite_index].screen_region[2] as usize / 2) / 104;
+                    let grid_y = 5 - (sprites[curr_sprite_index].screen_region[1] as usize - 89) / 81;
+
                     // if the piece is red, mark the corresponding spot in the game_grid as filled with yellow
                     if curr_sprite_index % 2 == 0 {
-                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
-                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "yellow");
-                        }
-    
-                    else{
-                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
-                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "red");
+                        game_grid.fill_space(grid_x, grid_y,  "yellow");
+                    } else{
+                        game_grid.fill_space(grid_x, grid_y,  "red");
                     }
 
                     // move onto the next sprite
                     curr_sprite_index += 1;
                     // move the cell pointer one forward to mark that another has been added to the screen
-                    curr_cell_index += 1;
-                    vertical_position = 0.0;
+                    placed_cells += 1;
 
-                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
-                    // println!("{}", game_grid.check_win());
-
-                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
-                    // sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
-
+                    // this code ensures that the next sprite rendered shows up in the center top of the screen
                     sprite_position[0] = 330.0;
                     sprite_position[1] = 575.0;
 
                     let (over, winning_color) = game_grid.check_win();
-                    // println!("{} {}", over, winning_color);
                     if over {
                         println!("{} wins!", winning_color);
-                        game_over = true;
                         show_end_screen = true;
                         win_color = winning_color.to_string();
                     }
 
-                    // check if the piece has hit the bottom of the screen
+                // check if the piece has hit the bottom of the screen
                 } else if sprite_position[1] <= 89.0 {
                     println!("{}", "bottom!");
+
                     // set the current sprite's y to the bottom of the screen
                     sprites[curr_sprite_index].screen_region[1] = 89.0;
-                    sprite_position[1] = 89.0;
 
-                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
-                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
-                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+                    // left x coordinate plus half the width selects the center of the sprite 
+                    let grid_x = (sprites[curr_sprite_index].screen_region[0] as usize + sprites[curr_sprite_index].screen_region[2] as usize / 2) / 104;
+                    let grid_y = 5 - (sprites[curr_sprite_index].screen_region[1] as usize - 89) / 81;
 
-                    
-                    
+                    // if the piece is red, mark the corresponding spot in the game_grid as filled with yellow
                     if curr_sprite_index % 2 == 0 {
-                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
-                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "yellow");
-                        }
-    
-                    else{
-                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
-                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "red");
+                        game_grid.fill_space(grid_x, grid_y,  "yellow");
+                    } else{
+                        game_grid.fill_space(grid_x, grid_y,  "red");
                     }
 
                     // move onto the next sprite 
                     curr_sprite_index += 1;
                     // move the cell pointer one forward to mark that another has been added to the screen
-                    curr_cell_index += 1;
-                    vertical_position = 0.0;
-                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    placed_cells += 1;
                     
                     sprite_position[0] = 330.0;
                     sprite_position[1] = 575.0;
 
                     let (over, winning_color) = game_grid.check_win();
-                    // println!("{} {}", over, winning_color);
                     if over {
                         println!("{} wins!", winning_color);
-                        game_over = true;
                         show_end_screen = true;
                         win_color = winning_color.to_string();
                     }
 
-                } else{
-                    // Update the Y-coordinate of each sprite
-                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
-                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
-                }
-                
-                
+                } 
+
                 // Then send the data to the GPU!
                 input.next_frame();
 
@@ -828,7 +721,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 {
                     if show_end_screen{
-                        println!("end screen");
                         let tex_end = 
                         if win_color == "yellow" {
                             &tex_yellow
@@ -898,13 +790,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         }
                         rpass.set_bind_group(0, &sprite_bind_group, &[]);
                         rpass.set_bind_group(1, &texture_bind_group, &[]);
-                        // draw two triangles per sprite, and sprite at the current index.
-                        // this uses instanced drawing, but it would also be okay
-                        // to draw 6 * sprites.len() vertices and use modular arithmetic
-                        // to figure out which sprite we're drawing.
+                        // draw the current sprite
                         rpass.draw(0..6, (curr_sprite_index as u32)..(curr_sprite_index as u32)+1);
-                        rpass.draw(0..6, 1..(curr_cell_index as u32));
-                        rpass.draw(0..6, (0.0 as u32)..(0.0 as u32)+1);
+                        // draw all the sprites that have already been placed
+                        rpass.draw(0..6, 1..(placed_cells as u32));
+                        // draw the connect 4 grid
+                        rpass.draw(0..6, 0..1);
+
                     }
                             
                 }
