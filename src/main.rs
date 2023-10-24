@@ -11,15 +11,6 @@ use winit::{
 mod input;
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Occupation {
-    Empty = 0,
-    // White = 1,
-    // Light = 2,
-    // Dark = 3,
-}
-
-#[repr(C)]
 #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
 struct GPUCamera {
     screen_pos: [f32; 2],
@@ -33,11 +24,11 @@ struct GPUSprite {
     sheet_region: [f32; 4],
 }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct Grid {
-    rows: [[Occupation; 10]; 24]
-}
+// #[repr(C)]
+// #[derive(Clone, Copy)]
+// struct Grid {
+//     rows: [[Occupation; 10]; 24]
+// }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SpriteOption {
@@ -74,7 +65,7 @@ impl GameGrid {
         let mut grid = [[Space::new(0.0, 0.0, "white"); 7]; 6];
 
         // Initialize the grid with space objects
-        let mut y_cord = 518.0;
+        let mut y_cord = 600.0;
         let mut x_cord = 8.0;
         for row in 0..6 {
             for col in 0..7 {
@@ -83,8 +74,8 @@ impl GameGrid {
                 grid[row][col] = Space::new(x, y, "nah");
                 y_cord -= 88.0;
             }
-            x_cord += 98.0;
-            y_cord = 518.0;
+            x_cord += 101.0;
+            y_cord = 600.0;
         }
 
         GameGrid { grid }
@@ -119,7 +110,7 @@ impl GameGrid {
         }
     }
 
-    fn check_win(&self) -> bool {
+    fn check_win(&self) -> (bool, &str) {
         // Check horizontally
         for row in &self.grid {
             let mut consecutive_count = 0;
@@ -129,7 +120,7 @@ impl GameGrid {
                 if space.filled && space.color == last_color {
                     consecutive_count += 1;
                     if consecutive_count == 4 {
-                        return true; // Four consecutive spaces found horizontally
+                        return (true, space.color); // Four consecutive spaces found horizontally
                     }
                 } else {
                     consecutive_count = 1;
@@ -149,7 +140,7 @@ impl GameGrid {
                 if space.filled && space.color == last_color {
                     consecutive_count += 1;
                     if consecutive_count == 4 {
-                        return true; // Four consecutive spaces found vertically
+                        return (true, space.color); // Four consecutive spaces found vertically
                     }
                 } else {
                     consecutive_count = 1;
@@ -173,7 +164,7 @@ impl GameGrid {
                     if space.filled && space.color == last_color {
                         consecutive_count += 1;
                         if consecutive_count == 4 {
-                            return true; // Four consecutive spaces found diagonally
+                            return (true, space.color); // Four consecutive spaces found diagonally
                         }
                     } else {
                         consecutive_count = 1;
@@ -198,7 +189,7 @@ impl GameGrid {
                     if space.filled && space.color == last_color {
                         consecutive_count += 1;
                         if consecutive_count == 4 {
-                            return true; // Four consecutive spaces found diagonally
+                            return (true, space.color); // Four consecutive spaces found diagonally
                         }
                     } else {
                         consecutive_count = 1;
@@ -208,7 +199,7 @@ impl GameGrid {
             }
         }
 
-        false // No four consecutive spaces found
+        return (false, &"") // No four consecutive spaces found
     }
 
     
@@ -274,6 +265,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+    });
+
+    let shader2 = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader2.wgsl"))),
     });
 
     let texture_bind_group_layout =
@@ -386,6 +382,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         push_constant_ranges: &[],
     });
 
+    let pipeline_layout_over = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        bind_group_layouts: &[&texture_bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
 
@@ -430,6 +432,25 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         multiview: None,
     });
 
+    let render_pipeline_over = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: None,
+        layout: Some(&pipeline_layout_over),
+        vertex: wgpu::VertexState {
+            module: &shader2,
+            entry_point: "vs_main",
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader2,
+            entry_point: "fs_main",
+            targets: &[Some(swapchain_format.into())],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    });
+
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: swapchain_format,
@@ -442,7 +463,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     surface.configure(&device, &config);
 
-    let (sprite_tex, _sprite_img) = load_texture("content/connect4sprites.png", None, &device, &queue)
+    let (sprite_tex, _sprite_img) = load_texture("content/connect4v2.png", None, &device, &queue)
         .await
         .expect("Couldn't load spritesheet texture");
     let view_sprite = sprite_tex.create_view(&wgpu::TextureViewDescriptor::default());
@@ -466,7 +487,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     
     let camera = GPUCamera {
         screen_pos: [0.0, 0.0],
-        screen_size: [700.0, 650.0],
+        screen_size: [724.0, 650.0],
     };
     let buffer_camera = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -481,36 +502,29 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         // sheet_region [x,y,z,w] = divided by spritesheet width, divided by spritesheet height, divided by spritesheet width, divided by spritesheet height, divided by spritesheet width, divided by spritesheet height,
         // T1
         GPUSprite {
-            screen_region: [0.0, 0.0, 700.0, 650.0],
-            sheet_region: [0.0, 0.0 / 650.0, 700.0 / 800.0, 650.0 / 650.0],
+            screen_region: [0.0, 0.0, 724.0, 650.0],
+            sheet_region: [0.0, 0.0 / 810.0, 724.0 / 724.0, 650.0 / 810.0],
         }, 
     ];
 
-
-    let mut cell_sprites: Vec<GPUSprite> = Vec::new();
     for _ in 0..70 {
         let sprite = GPUSprite {
-            screen_region: [700.0, 0.0, 100.0, 85.0],
-            sheet_region: [700.0 / 800.0, 0.0 / 650.0, 100.0 / 800.0, 85.0/ 650.0]
+            screen_region: [0.0, 651.0, 70.0, 67.0],
+            sheet_region: [0.0 / 724.0, 651.0 / 810.0, 70.0 / 724.0, 67.0/ 810.0]
         };
         sprites.push(sprite);
         let sprite2 = GPUSprite {
-            screen_region: [700.0, 90.0, 100.0, 85.0],
-            sheet_region: [700.0 / 800.0, 90.0 / 650.0, 100.0 / 800.0, 85.0/ 650.0]
+            screen_region: [0.0, 720.0, 70.0, 67.0],
+            sheet_region: [0.0 / 724.0, 720.0 / 810.0, 70.0 / 724.0, 67.0/ 810.0]
         };
         sprites.push(sprite2);
     }
 
-
-    let window_width = config.width as f32;
-    // let window_height = config.height as f32;
-
     // here divide by a number to create the number of grids
-    let cell_width = 98.0 ;
-    // let cell_height = window_height / 160.0;
+    let cell_width = 104.0 ;
 
     // Initialize sprite positions within the grid
-    let mut sprite_position: [f32; 2] = [302.0, 518.0];
+    let mut sprite_position: [f32; 2] = [330.0, 575.0];
 
     // current sprite
     let mut curr_sprite_index = 1;
@@ -567,8 +581,25 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut input = input::Input::default();
     let mut game_grid = GameGrid::new();
+    let mut game_over = false;
+    let mut show_end_screen = false;
+    let mut win_color = "".to_string();
+
+    let (tex_yellow, _win_image) = load_texture("content/yellowWins.png",None, &device, &queue)
+        .await
+        .expect("Couldn't load game over img");
+
+    let (tex_red, _win_image) = load_texture("content/redWins.png",None, &device, &queue)
+        .await
+        .expect("Couldn't load game over img");
     
     event_loop.run(move |event, _, control_flow| {
+        // if game_over {
+        //     // If the 'over' variable is true, exit the event loop
+        //     *control_flow = ControlFlow::Exit;
+        //     return;
+        // }
+    
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent {
@@ -583,18 +614,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-
                 
-  
                 // handles the left movement of the chip
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Left) {
-                    if sprite_position[0] <= 10.0 {
-                        sprite_position[0] = 10.0;
+                    if sprite_position[0] <= 124.0 {
+                        sprite_position[0] = 21.0;
                     }
                     
                     else{
-                       sprite_position[0] -= cell_width; 
+                    sprite_position[0] -= cell_width; 
                     }
+
                     println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
@@ -602,8 +632,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Right) {
 
                     // println!("{}", window_width);
-                    if sprite_position[0] >= 596.0 {
-                        sprite_position[0] = 596.0;
+                    if sprite_position[0] > 536.0 {
+                        sprite_position[0] = 638.0;
                     } else {
                         sprite_position[0] += cell_width;
                     }
@@ -611,35 +641,31 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
-                // handles the down movemnet
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Down) {
-                    // println!("{}   {}", x, curr_x);
-                    
 
-                    // vertical_position += 90.0;
-                    sprite_position[1] -= 88.0;
-
+                    sprite_position[1] -= 81.0;
                     println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Up) {
 
-                    println!("Game Over?");
-                    println!("{}",game_grid.check_win());
 
-                    // Fill a space (for example, at X=2 and Y=3)
-
-                    // Print the updated grid
-                    println!("Updated Grid:");
+                    // let (is_winner, winning_color) = game_grid.check_win();
+                    // println!("{}", game_grid.print_grid());
                     game_grid.print_grid();
-                    // println!("{:?}", game_grid.print_space(2,5));
+                    let my_bool = game_grid.check_win();
+                    println!("{:?}", my_bool)
+                    // if is_winner {
+                    //     println!("Player {} wins!", winning_color);
+                    // } else {
+                    //     println!("No winner yet.");
+                    // }
 
-                    println!("Game Over?");
-                    println!("{}",game_grid.check_win());
 
                 }
-
-                sprite_position[1] -= scroll_speed;
+                
+                // make the sprite scroll down each frame
+                // sprite_position[1] -= scroll_speed;
 
 
 
@@ -651,15 +677,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 
                 // get the current location
                 let curr_x = sprites[curr_sprite_index].screen_region[0];
-                let mut curr_y = sprites[curr_sprite_index].screen_region[1] - vertical_position;
+                let curr_y = sprites[curr_sprite_index].screen_region[1];
                 let mut collision = false;
                 let mut y_being_checked = 0.0;
 
                 //  check if the current location has a sprite in it by looping through coins up to the current coin
-                for curr_cell_index in 1..curr_sprite_index {
-                    let x = sprites[curr_cell_index].screen_region[0];
-                    let y = sprites[curr_cell_index].screen_region[1];
-                    // println!("{}   {}", x, curr_x);
+                for curr in 1..curr_sprite_index {
+                    let x = sprites[curr].screen_region[0];
+                    let y = sprites[curr].screen_region[1];
+                    // println!("x{}   {}", x, curr_x);
+                    // println!("y{}   curry{}", y, curr_y);
                     if x == curr_x && y == curr_y {
                         // Update the screen_region of the current sprite
                         y_being_checked = y;
@@ -669,38 +696,68 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
 
                 if collision {
-                    println!("{}", "collision!");
+                    println!("collision!");
                     //update sprite position to be 88px above sprite location
-                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 88.0;
-                    sprite_position[1] += 88.0;
+                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 81.0;
+                    sprite_position[1] += 81.0;
+
+                    // if the piece is red, mark the corresponding spot in the game_grid as filled with yellow
+                    if curr_sprite_index % 2 == 0 {
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "yellow");
+                        }
+    
+                    else{
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "red");
+                    }
+
                     // move onto the next sprite
                     curr_sprite_index += 1;
                     // move the cell pointer one forward to mark that another has been added to the screen
                     curr_cell_index += 1;
                     vertical_position = 0.0;
+
                     println!("{}   {}", sprite_position[0], sprite_position[1]);
-                    println!("{}", " yo collision!");
-                    println!("{} {}", ((sprite_position[0] as usize - 8) / 88), 5 - (sprite_position[1] as usize - 78) / 88);
-
-                    if curr_sprite_index % 2 == 0 {
-                    game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "yellow");
-                    }
-
-                    else{
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "red");
-                    }
+                    // println!("{}", game_grid.check_win());
 
                     sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
-                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
-                    sprite_position[0] = 302.0;
-                    sprite_position[1] = 518.0;
+                    // sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+
+                    sprite_position[0] = 330.0;
+                    sprite_position[1] = 575.0;
+
+                    let (over, winning_color) = game_grid.check_win();
+                    // println!("{} {}", over, winning_color);
+                    if over {
+                        println!("{} wins!", winning_color);
+                        game_over = true;
+                        show_end_screen = true;
+                        win_color = winning_color.to_string();
+                    }
 
                     // check if the piece has hit the bottom of the screen
-                } else if sprite_position[1] < 78.0 {
+                } else if sprite_position[1] <= 89.0 {
                     println!("{}", "bottom!");
                     // set the current sprite's y to the bottom of the screen
-                    sprites[curr_sprite_index].screen_region[1] = 78.0;
-                    sprite_position[1] = 78.0;
+                    sprites[curr_sprite_index].screen_region[1] = 89.0;
+                    sprite_position[1] = 89.0;
+
+                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
+                    sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+
+                    
+                    
+                    if curr_sprite_index % 2 == 0 {
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "yellow");
+                        }
+    
+                    else{
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "red");
+                    }
 
                     // move onto the next sprite 
                     curr_sprite_index += 1;
@@ -708,41 +765,23 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     curr_cell_index += 1;
                     vertical_position = 0.0;
                     println!("{}   {}", sprite_position[0], sprite_position[1]);
-                    println!("{}", " yo bottom!");
+                    
+                    sprite_position[0] = 330.0;
+                    sprite_position[1] = 575.0;
+
+                    let (over, winning_color) = game_grid.check_win();
+                    // println!("{} {}", over, winning_color);
+                    if over {
+                        println!("{} wins!", winning_color);
+                        game_over = true;
+                        show_end_screen = true;
+                        win_color = winning_color.to_string();
+                    }
+
+                } else{
+                    // Update the Y-coordinate of each sprite
                     sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
                     sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
-
-
-                    // let result = (sprite_position[0] as usize - 8) / 88; // Convert f32 to usize
-                    // println!("{}", result);
-
-                    println!("{} {}", 5 - (sprite_position[1] as usize - 78) / 96, (sprite_position[0] as usize - 8) / 88);
-                    
-
-                    // game_grid.fill_space(5 - (sprite_position[1] as usize - 78) , (sprite_position[0] as usize - 8) / 88, "red");
-                    if curr_sprite_index % 2 == 0 {
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "yellow");
-                        }
-    
-                    else{
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88 , 5 - (sprite_position[1] as usize - 78) / 88,  "red");
-                    }
-                    sprite_position[0] = 302.0;
-                    sprite_position[1] = 518.0;
-
-
-
-                    
-
-                    
-
-                }
-
-                else{
-                
-                // Update the Y-coordinate of each sprite
-                sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
-                sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
                 }
                 
                 
@@ -758,45 +797,96 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
                 {
-                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                                store: true,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                    });
+                    if show_end_screen{
+                        println!("end screen");
+                        let tex_end = 
+                        if win_color == "yellow" {
+                            &tex_yellow
+                        } else {
+                            &tex_red
+                        };
+                        
+                        let view_end = tex_end.create_view(&wgpu::TextureViewDescriptor::default());
+                        let sampler_end = device.create_sampler(&wgpu::SamplerDescriptor::default());
+                        
+                        let tex_over_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: None,
+                            layout: &texture_bind_group_layout,
+                            entries: &[
+                                // One for the texture, one for the sampler
+                                wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: wgpu::BindingResource::TextureView(&view_end),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 1,
+                                    resource: wgpu::BindingResource::Sampler(&sampler_end),
+                                },
+                            ],
+                        });
+                        
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                    store: true,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                        });
+                        // draw game over sprite
+                        rpass.set_pipeline(&render_pipeline_over);
+                        // Attach the bind group for group 0
+                        rpass.set_bind_group(0, &tex_over_bind_group, &[]);
+                        // Now draw two triangles!
+                        rpass.draw(0..6, 0..1);
 
-
-                    
-                    rpass.set_pipeline(&render_pipeline);
-                    if SPRITES == SpriteOption::VertexBuffer {
-                        rpass.set_vertex_buffer(0, buffer_sprite.slice(..));
                     }
-                    rpass.set_bind_group(0, &sprite_bind_group, &[]);
-                    rpass.set_bind_group(1, &texture_bind_group, &[]);
-                    // draw two triangles per sprite, and sprite at the current index.
-                    // this uses instanced drawing, but it would also be okay
-                    // to draw 6 * sprites.len() vertices and use modular arithmetic
-                    // to figure out which sprite we're drawing.
-                    rpass.draw(0..6, (curr_sprite_index as u32)..(curr_sprite_index as u32)+1);
-                    rpass.draw(0..6, 1..(curr_cell_index as u32));
-                    rpass.draw(0..6, (0.0 as u32)..(0.0 as u32)+1);
 
-                    
+                    else {
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                    store: true,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                        });
+    
+    
+                        
+                        rpass.set_pipeline(&render_pipeline);
+                        if SPRITES == SpriteOption::VertexBuffer {
+                            rpass.set_vertex_buffer(0, buffer_sprite.slice(..));
+                        }
+                        rpass.set_bind_group(0, &sprite_bind_group, &[]);
+                        rpass.set_bind_group(1, &texture_bind_group, &[]);
+                        // draw two triangles per sprite, and sprite at the current index.
+                        // this uses instanced drawing, but it would also be okay
+                        // to draw 6 * sprites.len() vertices and use modular arithmetic
+                        // to figure out which sprite we're drawing.
+                        rpass.draw(0..6, (curr_sprite_index as u32)..(curr_sprite_index as u32)+1);
+                        rpass.draw(0..6, 1..(curr_cell_index as u32));
+                        rpass.draw(0..6, (0.0 as u32)..(0.0 as u32)+1);
+                    }
+                            
                 }
-
                 
                 queue.submit(Some(encoder.finish()));
                 frame.present();
                 window.request_redraw();
+                
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -859,6 +949,7 @@ async fn load_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
 ) -> Result<(wgpu::Texture, image::RgbaImage), Box<dyn std::error::Error>> {
+
     #[cfg(target_arch = "wasm32")]
     let img = {
         let fetch = web_sys::window()
