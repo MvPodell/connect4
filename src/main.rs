@@ -110,6 +110,15 @@ impl GameGrid {
         }
     }
 
+    fn check_space(&self, x: usize, y: usize) -> bool {
+        if x < 7 && y < 6 {
+            let space = &self.grid[y][x];
+            return space.filled;
+        } else {
+            return false; // Invalid indices are considered as not filled
+        }
+    }
+
     fn check_win(&self) -> (bool, &str) {
         // Check horizontally
         for row in &self.grid {
@@ -617,34 +626,51 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 
                 // handles the left movement of the chip
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Left) {
-                    if sprite_position[0] <= 124.0 {
-                        sprite_position[0] = 21.0;
-                    }
-                    
-                    else{
-                    sprite_position[0] -= cell_width; 
+                    let mut x_occupied = false;
+                    for curr in 1..curr_sprite_index {
+                        let x = sprites[curr].screen_region[0];
+                        let y = sprites[curr].screen_region[1];
+                        println!("{}   {}", sprite_position[0], x);
+                        if x == sprite_position[0]-cell_width && y == sprite_position[1] {
+                            // Update the screen_region of the current sprite
+                            x_occupied = true;
+                        } 
                     }
 
-                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    if sprite_position[0] <= 124.0 {
+                        sprite_position[0] = 21.0;
+                    } 
+                    else if !x_occupied {
+                        sprite_position[0] -= cell_width; 
+                    }
                 }
 
                 // handles the right movement 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Right) {
-
+                    let mut x_occupied = false;
+                    for curr in 1..curr_sprite_index {
+                        let x = sprites[curr].screen_region[0];
+                        let y = sprites[curr].screen_region[1];
+                        println!("{}   {}", sprite_position[0], x);
+                        if x == sprite_position[0]+cell_width && y == sprite_position[1] {
+                            // Update the screen_region of the current sprite
+                            x_occupied = true;
+                        } 
+                    }
                     // println!("{}", window_width);
                     if sprite_position[0] > 536.0 {
                         sprite_position[0] = 638.0;
-                    } else {
+                    } else if !x_occupied {
                         sprite_position[0] += cell_width;
                     }
 
-                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Down) {
 
                     sprite_position[1] -= 81.0;
-                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 if input.is_key_pressed(winit::event::VirtualKeyCode::Up) {
@@ -703,12 +729,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
                     // if the piece is red, mark the corresponding spot in the game_grid as filled with yellow
                     if curr_sprite_index % 2 == 0 {
-                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
                         game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "yellow");
                         }
     
                     else{
-                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
                         game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "red");
                     }
 
@@ -718,7 +744,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     curr_cell_index += 1;
                     vertical_position = 0.0;
 
-                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                     // println!("{}", game_grid.check_win());
 
                     sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
@@ -750,12 +776,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     
                     
                     if curr_sprite_index % 2 == 0 {
-                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
                         game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "yellow");
                         }
     
                     else{
-                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        // println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
                         game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "red");
                     }
 
@@ -764,7 +790,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     // move the cell pointer one forward to mark that another has been added to the screen
                     curr_cell_index += 1;
                     vertical_position = 0.0;
-                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    // println!("{}   {}", sprite_position[0], sprite_position[1]);
                     
                     sprite_position[0] = 330.0;
                     sprite_position[1] = 575.0;
