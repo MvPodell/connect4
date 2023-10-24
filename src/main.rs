@@ -521,10 +521,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     }
 
     // here divide by a number to create the number of grids
-    let cell_width = 101.0 ;
+    let cell_width = 104.0 ;
 
     // Initialize sprite positions within the grid
-    let mut sprite_position: [f32; 2] = [330.0, 600.0];
+    let mut sprite_position: [f32; 2] = [330.0, 575.0];
 
     // current sprite
     let mut curr_sprite_index = 1;
@@ -624,6 +624,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     else{
                     sprite_position[0] -= cell_width; 
                     }
+
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
                 // handles the right movement 
@@ -635,10 +637,35 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     } else {
                         sprite_position[0] += cell_width;
                     }
+
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
                 }
 
+                if input.is_key_pressed(winit::event::VirtualKeyCode::Down) {
+
+                    sprite_position[1] -= 81.0;
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                }
+
+                if input.is_key_pressed(winit::event::VirtualKeyCode::Up) {
+
+
+                    // let (is_winner, winning_color) = game_grid.check_win();
+                    // println!("{}", game_grid.print_grid());
+                    game_grid.print_grid();
+                    let my_bool = game_grid.check_win();
+                    println!("{:?}", my_bool)
+                    // if is_winner {
+                    //     println!("Player {} wins!", winning_color);
+                    // } else {
+                    //     println!("No winner yet.");
+                    // }
+
+
+                }
+                
                 // make the sprite scroll down each frame
-                sprite_position[1] -= scroll_speed;
+                // sprite_position[1] -= scroll_speed;
 
 
 
@@ -671,15 +698,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 if collision {
                     println!("collision!");
                     //update sprite position to be 88px above sprite location
-                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 88.0;
-                    sprite_position[1] += 88.0;
+                    sprites[curr_sprite_index].screen_region[1] = y_being_checked + 81.0;
+                    sprite_position[1] += 81.0;
 
                     // if the piece is red, mark the corresponding spot in the game_grid as filled with yellow
                     if curr_sprite_index % 2 == 0 {
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88, 5 - (sprite_position[1] as usize - 92) / 88,  "yellow");
-                    } else{
-                        // if the piece is yellow, mark the corresponding spot in the game_grid as filled with red
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88, 5 - (sprite_position[1] as usize - 92) / 88,  "red");
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "yellow");
+                        }
+    
+                    else{
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 81,  "red");
                     }
 
                     // move onto the next sprite
@@ -688,11 +718,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     curr_cell_index += 1;
                     vertical_position = 0.0;
 
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    // println!("{}", game_grid.check_win());
+
                     sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
                     // sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
 
                     sprite_position[0] = 330.0;
-                    sprite_position[1] = 600.0;
+                    sprite_position[1] = 575.0;
+
                     let (over, winning_color) = game_grid.check_win();
                     // println!("{} {}", over, winning_color);
                     if over {
@@ -703,22 +737,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     }
 
                     // check if the piece has hit the bottom of the screen
-                } else if sprite_position[1] <= 92.0 {
+                } else if sprite_position[1] <= 89.0 {
                     println!("{}", "bottom!");
                     // set the current sprite's y to the bottom of the screen
-                    sprites[curr_sprite_index].screen_region[1] = 92.0;
-                    sprite_position[1] = 92.0;
+                    sprites[curr_sprite_index].screen_region[1] = 89.0;
+                    sprite_position[1] = 89.0;
 
                     // println!("{}   {}", sprite_position[0], sprite_position[1]);
                     sprites[curr_sprite_index].screen_region[0] = sprites[curr_sprite_index].screen_region[0];
                     sprites[curr_sprite_index].screen_region[1] = sprites[curr_sprite_index].screen_region[1];
+
+                    
                     
                     if curr_sprite_index % 2 == 0 {
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88, 5 - (sprite_position[1] as usize - 92) / 88,  "yellow");
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "yellow");
                         }
     
                     else{
-                        game_grid.fill_space((sprite_position[0] as usize - 8) / 88, 5 - (sprite_position[1] as usize - 92) / 88,  "red");
+                        println!("{} , {}" , (sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88 );
+                        game_grid.fill_space((sprite_position[0] as usize - 21) / 104, 5 - (sprite_position[1] as usize - 89) / 88,  "red");
                     }
 
                     // move onto the next sprite 
@@ -726,9 +764,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     // move the cell pointer one forward to mark that another has been added to the screen
                     curr_cell_index += 1;
                     vertical_position = 0.0;
-
+                    println!("{}   {}", sprite_position[0], sprite_position[1]);
+                    
                     sprite_position[0] = 330.0;
-                    sprite_position[1] = 600.0;
+                    sprite_position[1] = 575.0;
 
                     let (over, winning_color) = game_grid.check_win();
                     // println!("{} {}", over, winning_color);
