@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your WebGPU App</title>
+
+</head>
+<body>
+    <canvas id="app-canvas" width="800" height="600"></canvas>
+
+    <script type="module">
+        import init, { run_app } from './connect4.js';
+
+        async function setupWebGPU() {
+            // Additional setup code for WebGPU, if needed
+        }
+
+        async function main() {
+            await init();
+
+            await setupWebGPU();
+
+            run_app();
+        }
+
+        main();
+    </script>
+</body>
+</html>

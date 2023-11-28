@@ -1,5 +1,5 @@
 [package]
-name = "connect-4"
+name = "connect4"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,3 +14,25 @@ pollster = "0.3"
 rand = "0.8.5"
 wgpu = "0.17"
 winit = "0.28.6"
+getrandom = { version = "0.2", features = ["js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3.64"
+console_error_panic_hook = "0.1.7"
+console_log = "1"
+wasm-bindgen-futures = "0.4.34"
+web-sys = {version="0.3.64", features = [
+    "Location",
+    "Blob",
+    "RequestInit",
+    "RequestMode",
+    "Request",
+    "Response",
+    "WebGl2RenderingContext",
+    "CanvasRenderingContext2d"
+] }
+
+[features]
+default = []
+vbuf = []
+webgl = ["wgpu/webgl", "vbuf"]
